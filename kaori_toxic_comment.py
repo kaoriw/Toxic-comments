@@ -32,7 +32,6 @@ classifier = nn.Linear(32,2, bias=True)
 lstm.train()
 classifier.train()
 
-losslayer = nn.CrossEntropyLoss()
 
 batchsize = 128
 
@@ -44,3 +43,22 @@ class Lstm(nn.Module):
     def forward(self, x):
         x = nn.MaxPool1d(10)(lstm(x))
         x = nn.Dropout(inplace = True)(classifier(x))
+        return x
+
+lstm = Lstm()
+
+input = embedded
+out = lstm(embedded)
+
+lstm.zero_grad()
+#out.backward(randn(1,6))
+
+lr = 0.05
+momentum = 0.5
+optimizer = optim.SGD(list(lstm.parameters())+list(classifier.parameters()), lr=lr, momentum=momentum)
+
+criterion = nn.CrossEntropyLoss()()
+optimizer.zero_grad()
+
+loss = criterion(out, y)
+loss.backward()
