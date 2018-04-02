@@ -19,7 +19,8 @@ batch_size = 25
 max_features = 20000
 maxlen = 100
 embed_size = 100
-epochs = 10
+# train the training data n times
+epochs = 1
 
 train = pd.read_csv("./data/train_small.csv")
 test = pd.read_csv("./data/test_small.csv")
@@ -31,6 +32,7 @@ y = train[list_classes].values
 sentences_test = test["comment_text"].fillna("CVxTz").values
 
 tokenizer = text.Tokenizer(num_words=max_features)
+# fit_on_text(texts): use texts(list) to generate token dictionary
 tokenizer.fit_on_texts(list(sentences_train))
 word_index = tokenizer.word_index # index of words
 
@@ -71,35 +73,36 @@ for word, i in word_index.items():
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        p = .1
+        p = .1 # drop rate
         self.embeddings = nn.Embedding(num_embeddings=max_features, embedding_dim=embed_size)
         self.embeddings.weight.data = torch.Tensor(embedding_matrix)
-
+        # data structure (batch, time_step, input), if batch is in the first position, batch_first=True, otherwise false
+        # input_siez=embed_size: number of input, hidden_size=50: number of neurons each layer, num_layers=1: number of layer
         self.lstm = nn.LSTM(embed_size, 50, 1, batch_first=True, bidirectional=True)
         self.hidden = (
             Variable(torch.zeros(2, 1, 50)),
-            Variable(torch.zeros(2, 1, 50)))
+            Variable(torch.zeros(2, 1, 50))) # hidden state
 
         self.max_pool = nn.MaxPool1d(100)
         self.dropout = nn.Dropout(p=p)
-        self.lin_1 = nn.Linear(100, 50)
-        self.relu = nn.ReLU()
+        self.lin_1 = nn.Linear(100, 50) # fully connected layer
+        self.relu = nn.ReLU() # activatoin function
         self.dropout_2 = nn.Dropout(p=p)
-        self.lin_2 = nn.Linear(50, 6)
+        self.lin_2 = nn.Linear(50, 6) # fully connected layer
         self.sig = nn.Sigmoid()
 
     def forward(self, x):
         x = self.embeddings(x)
-        x, self.hidden = self.lstm(x)
-        x = self.max_pool(x)
-        x = x.view(x.size(0), -1)
+        # x, self.hidden = self.lstm(x) # every time it will return a hidden state, we use it together with next data to generate new output
+        x, (h_n, h_c) = self.lstm(x) # myself
+        x = self.max_pool(x) # need to select only the last output to pool?
+        x = x.view(x.size(0), -1) # unscroll data,x.size(0) not change, the rest turns into one dimmension
         x = self.dropout(x)
-        x = self.lin_1(x)
-        x = self.relu(x)
+        x = self.lin_1(x) # fully connected layer
+        x = self.relu(x) # apply activation function 
         x = self.dropout_2(x)
-        x = self.lin_2(x)
+        x = self.lin_2(x) # fully connected layer
         return self.sig(x)
-
 
 def train():
     learnin1g_rate = 1e-4
@@ -112,17 +115,19 @@ def train():
         for batch_idx, (data, target) in enumerate(train_loader):
             data, target = Variable(data), Variable(target)
             y_pred = model(data)
-            loss = F.binary_cross_entropy(y_pred, target)
+            loss = F.binary_cross_entropy(y_pred, target) # binary cross entropy loss
             print(loss.data[0])
-            model.zero_grad()
+            model.zero_grad() # orginal, clear gradients for this training step
+            # optimizer.zero_grad() # myself, clear gradients for this training step
             loss.backward()
-            optimizer.step()
+            optimizer.step() # apply gradients
 
 #        model.eval()
 
 
 # create Net for model
 model = Net()
+print(model)
 # start train()
 train()
 model.eval()
